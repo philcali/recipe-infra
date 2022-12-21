@@ -1,0 +1,3 @@
+[submodule "lib/assets/api"]
+	path = lib/assets/api
+	url = https://github.com/philcali/recipe-api.git
