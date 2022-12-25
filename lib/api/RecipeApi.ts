@@ -1,17 +1,26 @@
 import { ArnFormat, Duration, Stack } from "aws-cdk-lib";
-import { CfnApi, CfnApiMapping, CfnDomainName, CfnIntegration, CfnRoute, CfnRouteProps, CfnStage } from "aws-cdk-lib/aws-apigatewayv2";
+import { CfnApi, CfnApiMapping, CfnAuthorizer, CfnDomainName, CfnIntegration, CfnRoute, CfnRouteProps, CfnStage } from "aws-cdk-lib/aws-apigatewayv2";
 import { ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { AttributeType, BillingMode, ITable, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Effect, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { Architecture, Code, Function, Handler, IFunction, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Architecture, Code, Function, IFunction, Runtime } from "aws-cdk-lib/aws-lambda";
 import { CnameRecord, IHostedZone } from "aws-cdk-lib/aws-route53";
 import { Construct } from "constructs";
+
+
+export interface RecipeApiAuthorizationProps {
+    readonly issue: string;
+    readonly audience: string[];
+    readonly scopes?: string[];
+}
 
 export interface RecipeApiProps {
     readonly apiName?: string;
     readonly table?: ITable;
     readonly code: Code;
     readonly enableDevelopmentOrigin?: boolean;
+    readonly customOrigins?: string[];
+    readonly authorization?: RecipeApiAuthorizationProps;
 }
 
 export interface RecipeApiDomainProps {
@@ -90,8 +99,10 @@ export class RecipeApi extends Construct implements IRecipeApi {
         if (props.enableDevelopmentOrigin === true) {
             allowOrigins.push('http://localhost:3000');
         }
+        props.customOrigins?.forEach(origin => allowOrigins.push(origin));
+        const apiName = props.apiName || 'RecipeApi';
         const api = new CfnApi(this, 'Http', {
-            name: props.apiName || 'RecipeApi',
+            name: apiName,
             protocolType: 'HTTP',
             corsConfiguration: {
                 allowCredentials: true,
@@ -129,7 +140,31 @@ export class RecipeApi extends Construct implements IRecipeApi {
             routeKey: '$default',
             target: `integrations/${resourceIntegration.ref}`
         };
-        // TODO: add auth
+        if (props.authorization) {
+            new CfnRoute(this, 'UnauthorizedRoute', {
+                apiId: this.apiId,
+                routeKey: 'OPTIONS /{proxy+}',
+                target: `integrations/${resourceIntegration.ref}`
+            });
+
+            const cognitoAuth = new CfnAuthorizer(this, 'Authorization', {
+                apiId: this.apiId,
+                authorizerType: 'JWT',
+                identitySource: ['$request.header.Authorization'],
+                jwtConfiguration: {
+                    issuer: props.authorization.issue,
+                    audience: props.authorization.audience
+                },
+                name: `${apiName}-auth`
+            });
+
+            functionRoute = {
+                ...functionRoute,
+                authorizationScopes: props.authorization.scopes,
+                authorizationType: 'JWT',
+                authorizerId: cognitoAuth.ref
+            }
+        }
         const resourceDefaultRoute = new CfnRoute(this, 'DefaultRoute', functionRoute);
         const resourceStage = new CfnStage(this, 'Deployment', {
             apiId: this.apiId,

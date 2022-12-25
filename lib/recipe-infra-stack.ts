@@ -4,11 +4,10 @@ import { Certificate } from 'aws-cdk-lib/aws-certificatemanager';
 import { Construct } from 'constructs';
 import { RecipeApi } from './api/RecipeApi';
 import { SubmoduleCode } from './SubmoduleCode';
-import * as path from 'path';
 import { HostedZone } from 'aws-cdk-lib/aws-route53';
-
-const CERTIFICATE_ID = 'cfd2c4cd-65f5-4f22-afc3-d25a21175478';
-const HOSTED_ZONE_ID = 'Z2E8L1UCDS6NK5';
+import { Constants } from './constants';
+import { RecipeAuthorization } from './auth/RecipeAuthorization';
+import * as path from 'path';
 
 export class RecipeInfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -17,28 +16,55 @@ export class RecipeInfraStack extends cdk.Stack {
     const certificate = Certificate.fromCertificateArn(this, 'WildcardCert', this.formatArn({
       service: 'acm',
       resource: 'certificate',
-      resourceName: CERTIFICATE_ID,
+      resourceName: Constants.CERTIFICATE_ID,
       arnFormat: ArnFormat.SLASH_RESOURCE_NAME
     }));
 
     const zone = HostedZone.fromHostedZoneAttributes(this, 'Domain', {
-      hostedZoneId: HOSTED_ZONE_ID,
-      zoneName: 'petroni.us'
-    })
+      hostedZoneId: Constants.HOSTED_ZONE_ID,
+      zoneName: Constants.BASE_DOMAIN
+    });
+
+    const apiDomain = `api.${Constants.BASE_DOMAIN}`;
+    const consoleDomain = `app.${Constants.BASE_DOMAIN}`;
+    const auth = new RecipeAuthorization(this, 'Auth', {
+      enableDevelopmentOrigin: true,
+      customOrigins: [
+        `https://${apiDomain}`,
+        `https://${consoleDomain}`
+      ]
+    });
+
+    auth.addDomain('CustomDomain', {
+      certificate,
+      zone,
+      domainName: `auth.${Constants.BASE_DOMAIN}`,
+      createARecord: true
+    });
 
     const api = new RecipeApi(this, 'Api', {
       apiName: 'RecipeApi',
+      enableDevelopmentOrigin: true,
+      customOrigins: [
+        `https://${consoleDomain}`
+      ],
       code: new SubmoduleCode(path.join(__dirname, 'assets', 'api'), {
         moduleName: 'lib/assets/api',
         buildCommand: './dev.make-zip.sh',
         buildOutput: 'build_function.zip'
-      })
+      }),
+      authorization: {
+        issue: auth.userPool.userPoolProviderUrl,
+        audience: [
+          auth.userPoolClient.userPoolClientId
+        ],
+      }
     });
 
     api.addDomain('CustomDomain', {
       certificate,
       zone,
-      domainName: 'api.petroni.us',
-    })
+      domainName: apiDomain 
+    });
   }
 }
