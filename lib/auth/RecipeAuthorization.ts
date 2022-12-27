@@ -120,8 +120,8 @@ export class RecipeAuthorization extends Construct implements IRecipeAuthorizati
                     OAuthScope.EMAIL,
                     OAuthScope.PROFILE
                 ],
-                callbackUrls: redirectUrls.map(origin => `https://${origin}/login`),
-                logoutUrls: redirectUrls.map(origin => `https://${origin}/logout`)
+                callbackUrls: redirectUrls.map(origin => `${origin}/login`),
+                logoutUrls: redirectUrls.map(origin => `${origin}/logout`)
             }
         });
 

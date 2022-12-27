@@ -30,7 +30,6 @@ export class RecipeInfraStack extends cdk.Stack {
     const auth = new RecipeAuthorization(this, 'Auth', {
       enableDevelopmentOrigin: true,
       customOrigins: [
-        `https://${apiDomain}`,
         `https://${consoleDomain}`
       ]
     });
