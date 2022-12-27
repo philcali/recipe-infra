@@ -9,7 +9,8 @@ import {
     UserPoolEmail,
     UserPoolIdentityProviderGoogle,
     ClientAttributes,
-    UserPoolClient
+    UserPoolClient,
+    ProviderAttribute
 } from "aws-cdk-lib/aws-cognito";
 import { ARecord, CnameRecord, IHostedZone, RecordTarget } from "aws-cdk-lib/aws-route53";
 import { Construct } from "constructs";
@@ -76,7 +77,14 @@ export class RecipeAuthorization extends Construct implements IRecipeAuthorizati
                 'openid',
                 'profile',
                 'email'
-            ]
+            ],
+            attributeMapping: {
+                email: ProviderAttribute.GOOGLE_EMAIL,
+                familyName: ProviderAttribute.GOOGLE_FAMILY_NAME,
+                givenName: ProviderAttribute.GOOGLE_GIVEN_NAME,
+                fullname: ProviderAttribute.GOOGLE_NAME,
+                profilePicture: ProviderAttribute.GOOGLE_PICTURE
+            }
         }));
 
         const writeAttributes = new ClientAttributes()
@@ -84,10 +92,13 @@ export class RecipeAuthorization extends Construct implements IRecipeAuthorizati
                 familyName: true,
                 givenName: true,
                 fullname: true,
-                email: true
+                email: true,
+                profilePicture: true
             });
         const readAttributes = writeAttributes
-            .withStandardAttributes({ emailVerified: true });
+            .withStandardAttributes({
+                emailVerified: true
+            });
 
         const redirectUrls = [];
         if (props?.enableDevelopmentOrigin === true) {
