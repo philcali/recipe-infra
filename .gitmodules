@@ -1,3 +1,6 @@
 [submodule "lib/assets/api"]
 	path = lib/assets/api
 	url = https://github.com/philcali/recipe-api.git
+[submodule "lib/assets/console"]
+	path = lib/assets/console
+	url = https://github.com/philcali/recipe-console.git

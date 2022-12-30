@@ -7,7 +7,9 @@ import { SubmoduleCode } from './SubmoduleCode';
 import { HostedZone } from 'aws-cdk-lib/aws-route53';
 import { Constants } from './constants';
 import { RecipeAuthorization } from './auth/RecipeAuthorization';
+import { RecipeConsole } from './console/RecipeConsole';
 import * as path from 'path';
+import { Source } from 'aws-cdk-lib/aws-s3-deployment';
 
 export class RecipeInfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -65,5 +67,17 @@ export class RecipeInfraStack extends cdk.Stack {
       zone,
       domainName: apiDomain 
     });
+
+    new RecipeConsole(this, 'Console', {
+      sources: [
+        Source.asset(path.join(__dirname, 'assets', 'console', 'build'))
+      ],
+      bucketName: 'philcali-recipe-console',
+      certificate,
+      zone,
+      domainNames: [
+        consoleDomain
+      ]
+    })
   }
 }
