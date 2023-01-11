@@ -1,5 +1,14 @@
 import { ArnFormat, Duration, Stack } from "aws-cdk-lib";
-import { CfnApi, CfnApiMapping, CfnAuthorizer, CfnDomainName, CfnIntegration, CfnRoute, CfnRouteProps, CfnStage } from "aws-cdk-lib/aws-apigatewayv2";
+import { 
+    CfnApi,
+    CfnApiMapping,
+    CfnAuthorizer,
+    CfnDomainName,
+    CfnIntegration,
+    CfnRoute,
+    CfnRouteProps,
+    CfnStage
+} from "aws-cdk-lib/aws-apigatewayv2";
 import { ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { AttributeType, BillingMode, ITable, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Effect, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
