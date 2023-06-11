@@ -8,6 +8,9 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
+    "submodule": "git submodule update --init",
+    "console": "(cd lib/assets/console && npm ci && npm run settings && npm run build)",
+    "constants": "echo 'export class Constants { static readonly GOOGLE_CLIENT_ID = \"\"; static readonly GOOGLE_SECRET_ID = \"\"; static readonly CERTIFICATE_ID = \"\"; static readonly HOSTED_ZONE_ID = \"\"; static readonly BASE_DOMAIN = \"\"; }' > lib/constants.ts",
     "cdk": "cdk"
   },
   "devDependencies": {
