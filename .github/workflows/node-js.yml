@@ -33,5 +33,6 @@ jobs:
     - run: npm ci
     - run: npm run submodule
     - run: npm run console
+    - run: npm run constants
     - run: npm run build --if-present
     - run: npm test
