@@ -9,7 +9,7 @@
     "watch": "tsc -w",
     "test": "jest",
     "submodule": "git submodule update --init",
-    "console": "(cd lib/assets/console && npm run settings && npm run build)",
+    "console": "(cd lib/assets/console && npm run ci && npm run settings && npm run build)",
     "cdk": "cdk"
   },
   "devDependencies": {
