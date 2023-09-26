@@ -1,4 +1,4 @@
-import { Duration } from "aws-cdk-lib";
+import { Duration, SecretValue } from "aws-cdk-lib";
 import { ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { 
     AccountRecovery,
@@ -72,7 +72,7 @@ export class RecipeAuthorization extends Construct implements IRecipeAuthorizati
             userPool,
             // TODO: replace with secrets manager
             clientId: Constants.GOOGLE_CLIENT_ID,
-            clientSecret: Constants.GOOGLE_SECRET_ID,
+            clientSecretValue: SecretValue.unsafePlainText(Constants.GOOGLE_SECRET_ID),
             scopes: [
                 'openid',
                 'profile',
