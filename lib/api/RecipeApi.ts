@@ -180,7 +180,7 @@ export class RecipeApi extends Construct implements IRecipeApi {
             stageName: '$default',
             autoDeploy: true
         });
-        resourceStage.addDependsOn(resourceDefaultRoute);
+        resourceStage.addDependency(resourceDefaultRoute);
         this.stageId = resourceStage.ref;
 
         const stack = Stack.of(this);
@@ -213,7 +213,7 @@ export class RecipeApi extends Construct implements IRecipeApi {
             domainName: props.domainName,
             stage: this.stageId
         });
-        mappingResource.addDependsOn(domainCreation);
+        mappingResource.addDependency(domainCreation);
 
         new CnameRecord(this, `${id}CNAME`, {
             domainName: domainCreation.attrRegionalDomainName,
