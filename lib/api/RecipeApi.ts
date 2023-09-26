@@ -12,7 +12,7 @@ import {
 import { ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { AttributeType, BillingMode, ITable, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Effect, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { Architecture, Code, Function, IFunction, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Architecture, Code, Function, IFunction, Runtime, RuntimeFamily } from "aws-cdk-lib/aws-lambda";
 import { CnameRecord, IHostedZone } from "aws-cdk-lib/aws-route53";
 import { Construct } from "constructs";
 
@@ -78,15 +78,15 @@ export class RecipeApi extends Construct implements IRecipeApi {
         this.table = table;
 
         let serviceFuncition = new Function(this, 'Function', {
-            handler: 'main',
-            runtime: Runtime.GO_1_X,
+            handler: 'bootstrap',
+            runtime: Runtime.PROVIDED_AL2,
             code: props.code,
             memorySize: 512,
             timeout: Duration.seconds(30),
             environment: {
                 'TABLE_NAME': this.table.tableName,
             },
-            architecture: Architecture.X86_64,
+            architecture: Architecture.X86_64
         });
         this.serviceFunction = serviceFuncition;
 
