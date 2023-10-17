@@ -14,6 +14,7 @@ import { AttributeType, BillingMode, ITable, StreamViewType, Table } from "aws-c
 import { Effect, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Architecture, Code, Function, IFunction, Runtime, RuntimeFamily } from "aws-cdk-lib/aws-lambda";
 import { CnameRecord, IHostedZone } from "aws-cdk-lib/aws-route53";
+import { ITopic, Topic } from "aws-cdk-lib/aws-sns";
 import { Construct } from "constructs";
 
 
@@ -52,6 +53,7 @@ export class RecipeApi extends Construct implements IRecipeApi {
     readonly serviceFunction: IFunction;
     readonly apiId: string;
     readonly stageId: string;
+    readonly notifications: ITopic;
 
     constructor(scope: Construct, id: string, props: RecipeApiProps) {
         super(scope, id);
@@ -77,7 +79,7 @@ export class RecipeApi extends Construct implements IRecipeApi {
         }
         this.table = table;
 
-        let serviceFuncition = new Function(this, 'Function', {
+        let serviceFunction = new Function(this, 'Function', {
             handler: 'bootstrap',
             runtime: Runtime.PROVIDED_AL2,
             code: props.code,
@@ -88,7 +90,7 @@ export class RecipeApi extends Construct implements IRecipeApi {
             },
             architecture: Architecture.X86_64
         });
-        this.serviceFunction = serviceFuncition;
+        this.serviceFunction = serviceFunction;
 
         this.serviceFunction.addToRolePolicy(new PolicyStatement({
             effect: Effect.ALLOW,
@@ -193,7 +195,33 @@ export class RecipeApi extends Construct implements IRecipeApi {
                 arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
                 resourceName: "*/*"
             })
-        })
+        });
+
+        this.notifications = new Topic(this, 'Notifications', {
+            displayName: "Recipe Notifications",
+            topicName: "RecipeNotifications",
+        });
+
+        // Allow the service to handle synchronous subscription passthrough
+        this.serviceFunction.addToRolePolicy(new PolicyStatement({
+            effect: Effect.ALLOW,
+            actions: [
+                "sns:Subscribe"
+            ],
+            resources: [
+                this.notifications.topicArn
+            ]
+        }));
+
+        this.serviceFunction.addToRolePolicy(new PolicyStatement({
+            effect: Effect.ALLOW,
+            actions: [
+                'Unsubscribe',
+                'GetSubscriptionAttributes',
+                'SetSubscriptionAttributes',
+            ].map(action => `sns:${action}`),
+            resources: [ '*' ],
+        }))
     }
 
     addDomain(id: string, props: RecipeApiDomainProps): void {
