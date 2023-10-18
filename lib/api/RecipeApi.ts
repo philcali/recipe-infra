@@ -79,6 +79,11 @@ export class RecipeApi extends Construct implements IRecipeApi {
         }
         this.table = table;
 
+        this.notifications = new Topic(this, 'Notifications', {
+            displayName: "Recipe Notifications",
+            topicName: "RecipeNotifications",
+        });
+
         let serviceFunction = new Function(this, 'Function', {
             handler: 'bootstrap',
             runtime: Runtime.PROVIDED_AL2,
@@ -87,6 +92,7 @@ export class RecipeApi extends Construct implements IRecipeApi {
             timeout: Duration.seconds(30),
             environment: {
                 'TABLE_NAME': this.table.tableName,
+                'TOPIC_ARN': this.notifications.topicArn,
             },
             architecture: Architecture.X86_64
         });
@@ -195,11 +201,6 @@ export class RecipeApi extends Construct implements IRecipeApi {
                 arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
                 resourceName: "*/*"
             })
-        });
-
-        this.notifications = new Topic(this, 'Notifications', {
-            displayName: "Recipe Notifications",
-            topicName: "RecipeNotifications",
         });
 
         // Allow the service to handle synchronous subscription passthrough
