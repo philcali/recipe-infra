@@ -8,8 +8,8 @@ import { HostedZone } from 'aws-cdk-lib/aws-route53';
 import { Constants } from './constants';
 import { RecipeAuthorization } from './auth/RecipeAuthorization';
 import { RecipeConsole } from './console/RecipeConsole';
-import * as path from 'path';
 import { Source } from 'aws-cdk-lib/aws-s3-deployment';
+import * as path from 'path';
 
 export class RecipeInfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {

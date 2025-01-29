@@ -10,7 +10,7 @@ import {
     CfnStage
 } from "aws-cdk-lib/aws-apigatewayv2";
 import { ICertificate } from "aws-cdk-lib/aws-certificatemanager";
-import { AttributeType, BillingMode, ITable, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
+import { AttributeType, BillingMode, ITable, ProjectionType, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Effect, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Architecture, Code, Function, IFunction, Runtime, RuntimeFamily } from "aws-cdk-lib/aws-lambda";
 import { CnameRecord, IHostedZone } from "aws-cdk-lib/aws-route53";
@@ -59,8 +59,9 @@ export class RecipeApi extends Construct implements IRecipeApi {
         super(scope, id);
 
         let table = props.table;
+        let indexes: string[] = [];
         if (!table) {
-            table = new Table(this, 'Data', {
+            let newTable = new Table(this, 'Data', {
                 partitionKey: {
                     name: 'PK',
                     type: AttributeType.STRING
@@ -76,6 +77,23 @@ export class RecipeApi extends Construct implements IRecipeApi {
                 timeToLiveAttribute: 'expiresIn',
                 stream: StreamViewType.NEW_AND_OLD_IMAGES,
             });
+            let indexName = 'GS1';
+            newTable.addGlobalSecondaryIndex({
+                indexName,
+                partitionKey: {
+                    name: `${indexName}-PK`,
+                    type: AttributeType.STRING
+                },
+                sortKey: {
+                    name: 'createTime',
+                    type: AttributeType.STRING
+                },
+                projectionType: ProjectionType.ALL,
+                readCapacity: 1,
+                writeCapacity: 1,
+            });
+            indexes.push(indexName);
+            table = newTable;
         }
         this.table = table;
 
@@ -110,6 +128,14 @@ export class RecipeApi extends Construct implements IRecipeApi {
             resources: [
                 this.table.tableArn
             ]
+        }));
+
+        this.serviceFunction.addToRolePolicy(new PolicyStatement({
+            effect: Effect.ALLOW,
+            actions: [
+                'dynamodb:Query',
+            ],
+            resources: indexes.map(indexName => `${this.table.tableArn}/index/${indexName}`),
         }));
 
         let allowOrigins = [];
