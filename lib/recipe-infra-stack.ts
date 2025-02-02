@@ -36,10 +36,11 @@ export class RecipeInfraStack extends cdk.Stack {
       ]
     });
 
+    const authDomainName = `auth.${Constants.BASE_DOMAIN}`;
     auth.addDomain('CustomDomain', {
       certificate,
       zone,
-      domainName: `auth.${Constants.BASE_DOMAIN}`,
+      domainName: authDomainName,
       createARecord: true
     });
 
@@ -52,10 +53,15 @@ export class RecipeInfraStack extends cdk.Stack {
       code: new SubmoduleCode(path.join(__dirname, 'assets', 'api'), {
         moduleName: 'lib/assets/api',
         buildCommand: './dev.make-zip.sh',
-        buildOutput: 'build_function.zip'
+        buildOutput: 'build_recipes_function.zip'
+      }),
+      authCode: new SubmoduleCode(path.join(__dirname, 'assets', 'api'), {
+        moduleName: 'lib/assets/api',
+        buildCommand: './dev.make-zip.sh cmd/auth/main.go',
+        buildOutput: 'build_auth_function.zip'
       }),
       authorization: {
-        issue: auth.userPool.userPoolProviderUrl,
+        issuer: authDomainName,
         audience: [
           auth.userPoolClient.userPoolClientId
         ],
