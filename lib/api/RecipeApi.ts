@@ -19,7 +19,7 @@ import { Construct } from "constructs";
 
 
 export interface RecipeApiAuthorizationProps {
-    readonly issue: string;
+    readonly issuer: string;
     readonly audience: string[];
     readonly scopes?: string[];
 }
@@ -28,6 +28,7 @@ export interface RecipeApiProps {
     readonly apiName?: string;
     readonly table?: ITable;
     readonly code: Code;
+    readonly authCode: Code;
     readonly enableDevelopmentOrigin?: boolean;
     readonly customOrigins?: string[];
     readonly authorization?: RecipeApiAuthorizationProps;
@@ -102,6 +103,10 @@ export class RecipeApi extends Construct implements IRecipeApi {
             topicName: "RecipeNotifications",
         });
 
+        let indexValues: {[key:string]:string} = {};
+        indexes.forEach((indexName, index) => {
+            indexValues[`INDEX_NAME_${index + 1}`] = indexName;
+        })
         let serviceFunction = new Function(this, 'Function', {
             handler: 'bootstrap',
             runtime: Runtime.PROVIDED_AL2,
@@ -111,32 +116,49 @@ export class RecipeApi extends Construct implements IRecipeApi {
             environment: {
                 'TABLE_NAME': this.table.tableName,
                 'TOPIC_ARN': this.notifications.topicArn,
+                ...indexValues,
             },
             architecture: Architecture.X86_64
         });
         this.serviceFunction = serviceFunction;
 
-        this.serviceFunction.addToRolePolicy(new PolicyStatement({
-            effect: Effect.ALLOW,
-            actions: [
-                'dynamodb:GetItem',
-                'dynamodb:PutItem',
-                'dynamodb:UpdateItem',
-                'dynamodb:DeleteItem',
-                'dynamodb:Query',
-            ],
-            resources: [
-                this.table.tableArn
-            ]
-        }));
+        let authFunction = new Function(this, 'AuthorizationFunction', {
+            handler: 'bootstrap',
+            runtime: Runtime.PROVIDED_AL2,
+            code: props.authCode,
+            memorySize: 512,
+            timeout: Duration.seconds(30),
+            environment: {
+                "TABLE_NAME": this.table.tableName,
+                "AUTH_POOL_URL": `https://${props.authorization?.issuer}`,
+                ...indexValues,
+            },
+            architecture: Architecture.X86_64,
+        });
 
-        this.serviceFunction.addToRolePolicy(new PolicyStatement({
-            effect: Effect.ALLOW,
-            actions: [
-                'dynamodb:Query',
-            ],
-            resources: indexes.map(indexName => `${this.table.tableArn}/index/${indexName}`),
-        }));
+        [serviceFunction, authFunction].forEach(func => {
+            func.addToRolePolicy(new PolicyStatement({
+                effect: Effect.ALLOW,
+                actions: [
+                    'dynamodb:GetItem',
+                    'dynamodb:PutItem',
+                    'dynamodb:UpdateItem',
+                    'dynamodb:DeleteItem',
+                    'dynamodb:Query',
+                ],
+                resources: [
+                    this.table.tableArn
+                ]
+            }));
+
+            func.addToRolePolicy(new PolicyStatement({
+                effect: Effect.ALLOW,
+                actions: [
+                    'dynamodb:Query',
+                ],
+                resources: indexes.map(indexName => `${this.table.tableArn}/index/${indexName}`),
+            }));
+        });
 
         let allowOrigins = [];
         if (props.enableDevelopmentOrigin === true) {
@@ -192,19 +214,36 @@ export class RecipeApi extends Construct implements IRecipeApi {
 
             const cognitoAuth = new CfnAuthorizer(this, 'Authorization', {
                 apiId: this.apiId,
-                authorizerType: 'JWT',
+                name: `${apiName}-auth`,
+                authorizerType: 'REQUEST',
                 identitySource: ['$request.header.Authorization'],
-                jwtConfiguration: {
-                    issuer: props.authorization.issue,
-                    audience: props.authorization.audience
-                },
-                name: `${apiName}-auth`
+                enableSimpleResponses: true,
+                authorizerResultTtlInSeconds: 60,
+                authorizerPayloadFormatVersion: "2.0",
+                authorizerUri: Stack.of(this).formatArn({
+                    service: 'apigateway',
+                    resource: 'path',
+                    account: 'lambda',
+                    arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
+                    resourceName: `2015-03-31/functions/${authFunction.functionArn}/invocations`
+                }),
+            });
+
+            authFunction.addPermission("Invoke", {
+                principal: new ServicePrincipal("apigateway.amazonaws.com"),
+                action: 'lambda:InvokeFunction',
+                sourceArn: Stack.of(this).formatArn({
+                    service: 'execute-api',
+                    resource: api.ref,
+                    arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
+                    resourceName: `authorizers/${cognitoAuth.ref}`,
+                })
             });
 
             functionRoute = {
                 ...functionRoute,
                 authorizationScopes: props.authorization.scopes,
-                authorizationType: 'JWT',
+                authorizationType: 'CUSTOM',
                 authorizerId: cognitoAuth.ref
             }
         }
@@ -217,11 +256,10 @@ export class RecipeApi extends Construct implements IRecipeApi {
         resourceStage.addDependency(resourceDefaultRoute);
         this.stageId = resourceStage.ref;
 
-        const stack = Stack.of(this);
         this.serviceFunction.addPermission('Invoke', {
             principal: new ServicePrincipal('apigateway.amazonaws.com'),
             action: 'lambda:InvokeFunction',
-            sourceArn: stack.formatArn({
+            sourceArn: Stack.of(this).formatArn({
                 service: 'execute-api',
                 resource: this.apiId,
                 arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
