@@ -12,7 +12,8 @@ import {
 import { ICertificate } from "aws-cdk-lib/aws-certificatemanager";
 import { AttributeType, BillingMode, ITable, ProjectionType, StreamViewType, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Effect, PolicyStatement, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { Architecture, Code, Function, IFunction, Runtime, RuntimeFamily } from "aws-cdk-lib/aws-lambda";
+import { Architecture, Code, Function, IFunction, Runtime, StartingPosition } from "aws-cdk-lib/aws-lambda";
+import { DynamoEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { CnameRecord, IHostedZone } from "aws-cdk-lib/aws-route53";
 import { ITopic, Topic } from "aws-cdk-lib/aws-sns";
 import { Construct } from "constructs";
@@ -29,6 +30,7 @@ export interface RecipeApiProps {
     readonly table?: ITable;
     readonly code: Code;
     readonly authCode: Code;
+    readonly eventsCode: Code;
     readonly enableDevelopmentOrigin?: boolean;
     readonly customOrigins?: string[];
     readonly authorization?: RecipeApiAuthorizationProps;
@@ -106,7 +108,8 @@ export class RecipeApi extends Construct implements IRecipeApi {
         let indexValues: {[key:string]:string} = {};
         indexes.forEach((indexName, index) => {
             indexValues[`INDEX_NAME_${index + 1}`] = indexName;
-        })
+        });
+
         let serviceFunction = new Function(this, 'Function', {
             handler: 'bootstrap',
             runtime: Runtime.PROVIDED_AL2,
@@ -136,7 +139,24 @@ export class RecipeApi extends Construct implements IRecipeApi {
             architecture: Architecture.X86_64,
         });
 
-        [serviceFunction, authFunction].forEach(func => {
+        let eventFunction = new Function(this, 'EventsFunction', {
+            handler: 'bootstrap',
+            runtime: Runtime.PROVIDED_AL2,
+            code: props.eventsCode,
+            memorySize: 512,
+            timeout: Duration.seconds(30),
+            environment: {
+                'TABLE_NAME': this.table.tableName,
+                ...indexValues,
+            }
+        });
+
+        eventFunction.addEventSource(new DynamoEventSource(this.table, {
+            startingPosition: StartingPosition.LATEST,
+            enabled: true,
+        }));
+
+        [serviceFunction, authFunction, eventFunction].forEach(func => {
             func.addToRolePolicy(new PolicyStatement({
                 effect: Effect.ALLOW,
                 actions: [
