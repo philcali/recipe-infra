@@ -60,6 +60,11 @@ export class RecipeInfraStack extends cdk.Stack {
         buildCommand: './dev.make-zip.sh cmd/auth/main.go',
         buildOutput: 'build_auth_function.zip'
       }),
+      eventsCode: new SubmoduleCode(path.join(__dirname, 'assets', 'api'), {
+        moduleName: 'lib/assets/api',
+        buildCommand: './dev.make-zip.sh cmd/events/main.go',
+        buildOutput: 'build_events_function.zip',
+      }),
       authorization: {
         issuer: authDomainName,
         audience: [
